@@ -1,6 +1,6 @@
 /* 
 Author: Guy Meyer
-Last Edited: March 10 2020
+Last Edited: March 11 2020
 
 Main file for bartender robot
   This controller is responsible for moving the cup and dispensing the liquid
@@ -56,8 +56,9 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Adafruit_MotorShield AFMS = Adafruit_MotorShield(0x61); 
 
 // Connect a stepper motor with 200 steps per revolution (1.8 degree)
-// to motor port #2 (M3 and M4)
+// to motor port #1 (M1 and M2)
 Adafruit_StepperMotor *myMotor = AFMS.getStepper(200, 1);
+Adafruit_StepperMotor *myMotor2 = AFMS.getStepper(400, 2);
 
 //Servo myservo;  // create servo object to control a servo 
                 // twelve servo objects can be created on most boards
@@ -69,6 +70,8 @@ enum PistonState {
 };
 
 // init variables - TODO make these "#define" expressions
+uint16_t motor_speed = 200;
+uint16_t micro_step_delay = 700;
 int ir_Pin = 2;  // IR sensor read pin
 int shot_time = 4000;  // time to dispense shot - milliseconds
 int refill_time = 2000;  // time for liquid dispenser to refill - milliseconds
@@ -90,9 +93,9 @@ short bottle5 = 2400;
 //int bottle6 = 2000; // remove (only 5 bottle)
 short max_rail = 2500;
 
-short drinks[][5] = {{bottle1, bottle2, bottle3, bottle4, bottle5},
-                   {bottle4, bottle2, bottle4, bottle5},
-                   {bottle4, bottle5, bottle1, bottle2}};
+short drinks[][5] = {{bottle1, bottle4, bottle4, bottle1},
+                   {bottle2, bottle2, bottle5, bottle5, bottle5},
+                   {bottle3, bottle4, bottle4, bottle3}};
 
 int desired_drink; 
 
@@ -135,21 +138,26 @@ void resetRail()
   while(true) {
     int IR_Value = digitalRead(ir_Pin);
     if (IR_Value == 1) {
-      myMotor->step(2, FORWARD, DOUBLE);
+      //myMotor->step(10, FORWARD, DOUBLE);
+      myMotor->onestep(FORWARD, SINGLE);
+      delayMicroseconds(micro_step_delay);  // advice from Bill from Adafruit
     } else {
       break; 
     }
-    delay(1);
+    //delay(1);
   }
   
   platform_pos = 0;
   
-  //Serial.println("Reached Start!");
-  
-  //servoUp();
-  //Serial.println("Insert Cup, Ready for Drink!");
-  
-  //return;
+  // allow motor to move freely
+  myMotor->release();
+}
+
+void moveToStart()
+{
+  // prepare system
+  pistonDown();
+  resetRail();
 }
 
 void moveTo(int bottle_num)
@@ -162,10 +170,15 @@ void moveTo(int bottle_num)
   Serial.println();
   */
   
-  short steps_needed;  // tmp variable
+  int steps_needed;  // tmp variable
   
   if (platform_pos < bottle_num) {  // Move BACKWARD (away from start)
     steps_needed = bottle_num - platform_pos;
+    
+    // testing of new motor speeds 
+    //quickMove(steps_needed, BACKWARD);
+    
+    // This line currently works but really slow
     myMotor->step(steps_needed, BACKWARD, DOUBLE);
     
   } else if (platform_pos > bottle_num) {  // Move FORWARD (towards start)
@@ -200,7 +213,10 @@ void setup()
   AFMS.begin();  // create with the default frequency 1.6KHz
   //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
   
-  myMotor->setSpeed(800);  // 10 rpm ?
+  // From Adafruit support page: https://forums.adafruit.com/viewtopic.php?f=31&t=57041&start=15
+  TWBR = ((F_CPU /400000l) - 16) / 2; // Change the i2c clock to 400KHz
+  
+  myMotor->setSpeed(motor_speed);  // 10 rpm ?
   pinMode(ir_Pin, INPUT);  // IR detect sensor
   pinMode(piston_UP_Pin, OUTPUT);
   pinMode(piston_DOWN_Pin, OUTPUT);
@@ -209,71 +225,48 @@ void setup()
   digitalWrite(piston_UP_Pin, HIGH);
   digitalWrite(piston_DOWN_Pin, HIGH);
   
-  pistonDown();
-  resetRail();
+  moveToStart();
+  
+  // clear the serial buffer
+  Serial.read();
+  Serial.flush();
   
   delay(1000);
 } 
 
-// used for testing
-void loopTest()
-{
-  if (Serial.available()) {
-    delay(2000);
-    moveTo(bottle4);
-    delay(3000); 
-    takeShot();
-    delay(1000);
-    resetRail();
-  }
-  
-  Serial.read();
-  Serial.flush();
-}
-
 void loop() 
 {
-  int shots_count;  // tracks the number of liquid shots required for current drink (used in for loop)
   
   if (Serial.available()) {
     desired_drink = Serial.read();
     Serial.flush();
-    //Serial.println(desired_drink);
     Serial.flush();
     
     // need to convert ASCII to int
     desired_drink = desired_drink - '0';
     
-    // calculate number of stops
-    shots_count = sizeof(drinks[desired_drink])/2;  // why divided by 2?
+    // calculate number of stops - tracks the number of liquid shots required for current drink (used in for loop)
+    uint16_t shots_count = sizeof(drinks[desired_drink])/2;  // why divided by 2?
     
-    // prepare piston
-    //pistonDown();
+    moveToStart();
     
-    //shots_count = 4;
+    delay(1000);
     
     for (int i = 0; i < shots_count; i++)
     {
-      //Serial.println(i);
-      //Serial.println();
-      //delay(2000);
       moveTo(drinks[desired_drink][i]);
-      //delay(1000);
-      //takeShot();
+      delay(200);
       takeShot();
       delay(1000);
     }
     
-    resetRail();  // move to start
-    /*Serial.println();
-    Serial.println("Enjoy your drink!");
-    Serial.println();*/
+    // return cup to user
+    moveToStart();  // move to start
     
     Serial.write("F");  // code denotes that drink is ready
     
   }
 
-  //servoUp();
 } 
 
 
