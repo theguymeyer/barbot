@@ -58,7 +58,6 @@ Adafruit_MotorShield AFMS = Adafruit_MotorShield();
 // Connect a stepper motor with 200 steps per revolution (1.8 degree)
 // to motor port #1 (M1 and M2)
 Adafruit_StepperMotor *myMotor = AFMS.getStepper(200, 1);
-Adafruit_StepperMotor *myMotor2 = AFMS.getStepper(400, 2);
 
 //Servo myservo;  // create servo object to control a servo 
                 // twelve servo objects can be created on most boards
@@ -71,7 +70,7 @@ enum PistonState {
 
 // init variables - TODO make these "#define" expressions
 uint16_t motor_speed = 200;
-uint16_t micro_step_delay = 700;
+uint16_t micro_step_delay = 900;
 int ir_Pin = 2;  // IR sensor read pin
 int shot_time = 4000;  // time to dispense shot - milliseconds
 int refill_time = 2000;  // time for liquid dispenser to refill - milliseconds
@@ -86,16 +85,17 @@ PistonState piston_state = DOWN;
 // bottle positions
 short start = 0;
 short bottle1 = 420;
-short bottle2 = 950;
-short bottle3 = 1400;
-short bottle4 = 1890;
-short bottle5 = 2400;
+short bottle2 = 900;
+short bottle3 = 1350;
+short bottle4 = 1840;
+short bottle5 = 2350;
 //int bottle6 = 2000; // remove (only 5 bottle)
 short max_rail = 2500;
 
-short drinks[][5] = {{bottle1, bottle4, bottle4, bottle1},
-                   {bottle2, bottle2, bottle5, bottle5, bottle5},
-                   {bottle3, bottle4, bottle4, bottle3}};
+short drinks[][5] = {{bottle1, bottle2, bottle3, bottle4, bottle5},
+        {bottle1, bottle4, bottle4, bottle1},
+        {bottle2, bottle2, bottle5, bottle5, bottle5},
+        {bottle3, bottle4, bottle4, bottle3}};
 
 int desired_drink; 
 
