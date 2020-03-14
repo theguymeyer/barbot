@@ -92,12 +92,12 @@ short bottle5 = 2350;
 //int bottle6 = 2000; // remove (only 5 bottle)
 short max_rail = 2500;
 
-short drinks[][5] = {{bottle1, bottle2, bottle3, bottle4, bottle5},
-        {bottle1, bottle4, bottle4, bottle1},
-        {bottle2, bottle2, bottle5, bottle5, bottle5},
-        {bottle3, bottle4, bottle4, bottle3}};
+short drinks[][5] = {{bottle1, bottle4, bottle4},  // vodka cran
+        {bottle2, bottle5, bottle5},  // whiskey coke
+        {bottle3, bottle3, bottle3},  // red wine
+        {bottle1, bottle2, bottle3, bottle4, bottle5}};
 
-int desired_drink; 
+char desired_drink = '*'; 
 
 /* Piston Control Functions */
 
@@ -237,16 +237,21 @@ void setup()
 void loop() 
 {
   
-  if (Serial.available()) {
-    desired_drink = Serial.read();
+  desired_drink = Serial.read();
+  if (desired_drink == '0' || desired_drink == '1' || desired_drink == '2') {
     Serial.flush();
     Serial.flush();
+    
+    Serial.println(desired_drink);
     
     // need to convert ASCII to int
     desired_drink = desired_drink - '0';
     
     // calculate number of stops - tracks the number of liquid shots required for current drink (used in for loop)
-    uint16_t shots_count = sizeof(drinks[desired_drink])/2;  // why divided by 2?
+    //int shots_count = sizeof(drinks[desired_drink]);  // why divided by 2?
+    int shots_count = 3;  // all drinks should have size of 3 shots
+    
+    Serial.println(shots_count);
     
     moveToStart();
     
@@ -263,9 +268,18 @@ void loop()
     // return cup to user
     moveToStart();  // move to start
     
-    Serial.write("F");  // code denotes that drink is ready
+    
+    Serial.flush();
+    Serial.flush();
+    delay(100);
+    Serial.print("F");  // code denotes that drink is ready
+    delay(500);
     
   }
+  desired_drink = '*';
+  
+  delay(10);
+  Serial.flush();
 
 } 
 

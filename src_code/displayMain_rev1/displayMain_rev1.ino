@@ -61,9 +61,9 @@ int lcd_key     = 0;
 int adc_key_in  = 0;
 
 // Drink Options
-char d1[] = "Vodka & Coke";
-char d2[] = "Gin & Tonic";
-char d3[] = "Rum & Coke";
+char d1[] = "Vodka & Cran";
+char d2[] = "Whisky Coke";
+char d3[] = "Red Wine";
 char* drink_names[] = {d1,d2,d3};
 char drinks_serial_ID[] = {'0','1','2'};  // corresponding to Drink Options (above)
 int current_drink = 0;  // integer referencing the position in the list of available drinks
@@ -166,16 +166,18 @@ void make_drink(int drink_num) {
   
   Serial.write(drinks_serial_ID[drink_num]);
 
+  lcd.setCursor(0,0);
+  lcd.print("Preparing");
   while(!(Serial.available())){
     // load screen
-    lcd.setCursor(0,0);
-    lcd.print("Preparing.  ");
+    lcd.setCursor(9,0);
+    lcd.print(".  ");
     delay(delay_time);
-    lcd.setCursor(0,0);
-    lcd.print("Preparing.. ");
+    lcd.setCursor(9,0);
+    lcd.print(".. ");
     delay(delay_time);
-    lcd.setCursor(0,0);
-    lcd.print("Preparing...");
+    lcd.setCursor(9,0);
+    lcd.print("...");
     delay(delay_time);
   }
   
@@ -228,30 +230,7 @@ void loop()
  
 }
   
-  
-/*  
-void loop_testing()
-{
- 
-  lcd.setCursor(0,1);            // move to the begining of the second line
-  lcd_key = read_LCD_buttons();  // read the buttons
- 
-  // may terminate while program during function call if drink selected - ugh what?
-  current_drink = scroll_menu(lcd_key, current_drink);
-  
-  // clear bottom line
-  clearLine(1);
-  
-  // displays drink in list
-  lcd.print(drink_names[current_drink]);
-  lcd.setCursor(13,1);
-  lcd.print(current_drink + 1);
-  lcd.print("/");
-  lcd.print(total_drinks);
- 
-}
 
-*/
 
 
 
