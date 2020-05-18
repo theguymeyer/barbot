@@ -10,7 +10,7 @@
 //
 //	- Software: OUTPUT: mainFile.ino receives a serial message indicating the drink requirements based on 5 unique bottle
 //			serial message structure: uint8{Bottle_1, Bottle_2, Bottle_3, Bottle_4, Bottle_5} @ BAUDRATE=9600 via RX/TX serial bus
-//			where each Bottle is a byte describing the number of shots from each bottle. The system is not concerned with speed optimization with the serial buffer
+//			where each Bottle is a byte describing the number of shots from each bottle in ASCII. The system is not concerned with speed optimization with the serial buffer
 //
 //			INPUT: user taps on any combination of the six keys.
 //
