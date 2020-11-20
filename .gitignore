@@ -3,6 +3,9 @@
 *.out
 *.app
 
+# apple stuff
+.DS_Store
+
 CAD/
 bin/
 code/.vscode/
