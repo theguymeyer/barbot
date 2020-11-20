@@ -8,4 +8,4 @@ Well thats cool but how do I use it? The UI is displayed on an LCD mounted on to
 
 Just like most of my excessively detailed projects, there are a total of 17 3D printed parts plus other custom elements!
 
-If you enjoyed checking out this project take a look at my project page: www.guymeyer.me
+If you enjoyed checking out this project take a look at [my project page](https://guymeyer.me/projects)
