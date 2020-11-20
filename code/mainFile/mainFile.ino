@@ -175,14 +175,46 @@ void pathPlanner(int msg_buffer[], int path_buffer[][2])
   while (!isStepperAtStart()) { resetRail(); }
 
   int instruction [2] = {0,0};
-  for (int d = 0; d < sizeof(*msg_buffer); d++) {
-    
-    instruction[0] = bottle_position[d] - pos;
-    instruction[1] = msg_buffer[d];
+  for (int d = 0; d < sizeof(msg_buffer); d++) {
 
-    *path_buffer[d] = instruction;
+    if (msg_buffer[d] != 0) {
+      instruction[0] = bottle_position[d] - pos;
+      instruction[1] = msg_buffer[d];
+
+      path_buffer[d] = instruction;
+    }
   }
 
+}
+
+// Execution of path - moves cup through positions and pours liquor
+// Assumption: only requested liquors are in the path buffer
+void exec(int path_buf[][2])
+{
+
+  resetRail();
+
+  // since resetRail... therefore... 
+  int loc = 0;
+
+  for (int i = 0; i < sizeof(path_buf); i++) {
+
+    // move stepper to position until within margin of error
+    while (loc - path) {
+
+    }
+
+    // pistonUp();
+
+    // hold
+
+    // pistonDown();
+
+    // hold
+
+  }
+
+  resetRail();
 }
 
 void setup() 
@@ -208,6 +240,7 @@ void loop()
     pathPlanner(pmsg, path);
     
     // exec (move servo and actuate piston)
+    exec(path);
     
     // return home
 
