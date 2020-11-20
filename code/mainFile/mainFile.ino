@@ -1,6 +1,6 @@
 // Author: Guy Meyer
 // Date of creation: May 18th 2020
-// Last change date: May 18th 2020
+// Last change date: June 8th 2020
 // Objective: accept user input (serial) and execute the drink combination
 // System Description:
 //	- Hardware: 
@@ -41,8 +41,8 @@
 //        - the system will reset its end-effector -> first move piston down, then reset rail to starting position
 //        - the system will send finished drink code to UI
 //
-//
-//      __________                       _____________                      _______________                   _______________                   _______________  
+//         /                                /                                  /
+//      _\/_______                       _\/__________                      _\/____________                   _______________                   _______________  
 //  o-->|  INIT   |       -->            | USER_INPUT |       -->           | PATH_PLANNER |       -->        |  MAKE_DRINK  |       -->        | SERVE_DRINK |
 //      |_________|  SERIAL DETECTED     |____________|   PARSED MESSAGE    |______________|  DEFINED PLAN    |______________|  EXECUTED PATH   |_____________|
 //                                            /\                                                                                                       |
@@ -52,10 +52,156 @@
 //
 //
 
+#include <iostream>
+#include <Adafruit_MotorShield.h>
+
+#define DRINK_COUNT 5
+#define IR_THRESHOLD 0.9
+
+#define BOTTLE1_POS 500   // in number fo steps from start
+#define BOTTLE2_POS 1500
+#define BOTTLE3_POS 2500
+#define BOTTLE4_POS 3500
+#define BOTTLE5_POS 4500
+#define RAIL_MAX 5500
+
+// init variables
+int QRE1113_Pin = 2; //connected to digital 2
+std::vector<int> bottle_positions = {BOTTLE1_POS, BOTTLE2_POS, BOTTLE3_POS, BOTTLE4_POS, BOTTLE5_POS};
+
+/* --- Custom Functions --- */
+
+// alters the solenoid values to move the piston DOWN
+bool pistonDown()
+{
+  // TODO trigger relay for piston motion DOWN
+}
+
+// alters the solenoid values to move the piston UP
+bool pistonUp()
+{
+  // TODO trigger relay for piston motion UP
+}
+
+// moves the drink closer to the IR (starting position) with incremental steps
+// -> return true on successful motion (returns false otherwise)
+bool resetRail()
+{
+
+  pistonDown(); 
+
+  try
+  {
+    int QRE_Value = 0;
+    while(QRE_Value < IR_THRESHOLD) {
+      myMotor->step(1, FORWARD, DOUBLE);  // move closer
+
+      delay(2); // give the motor time to move
+      QRE_Value = digitalRead(QRE1113_Pin);
+    }
+
+    // reached start
+    pistonUp();
+    return true;
+
+  }
+  catch (const std::exception& e) 
+  {
+    std::cout << "Exception Caught\n";
+  }
+  
+  return false;
+}
+
+// fuck this is an open loop system - this is the best i can do :/
+bool isStepperAtStart()
+{
+  if (digitalRead(QRE1113_Pin) > IR_THRESHOLD) {
+    return true;
+  }
+
+  return false;
+}
+
+/* --- State Functions (executed on entry unless otherwise noted) --- */
+
+// system init - runs on boot
+// -> returns true when serial is established and the rail is reset (returns false otherwise)
+bool init()
+{
+
+  Serial.begin(9600); // init serial - no direct imports
+
+  Serial.print("HI"); // ACK send
+
+  int ACK;
+  if (Serial.available()) {
+    ACK = Serial.read();  // ACK receive
+
+    if (ACK == "HI") {  // transition criteria
+
+      resetRail();
+      return true;
+    }
+  }
+
+  return false;
+
+}
+
+// a waiting state for serial input regarding drink info
+// returns drink list (requirements for each drink) starting from closest
+std::vector<int> userInput()
+{
+
+  Serial.flush();
+
+  char* message = '';
+  std::vector<int> parsed_message (DRINK_COUNT, 0);
+
+  if (Serial.available()) { // keep checking serial
+    message = Stream.read();
+
+    if (message != '') {  // if message in buffer
+      for (int i = 0; i < DRINK_COUNT; i++) {
+        parsed_message[i] = (int)(message[i]);
+      }
+
+      break;
+    }
+  }
+
+  return parsed_message;
+}
+
+// Takes the user input and builds a path for the servo as a list of steps with directions
+// returns a list of instructions for the stepper (2d vector) [direction, steps, shots]
+// direction defined as 0 - FORWARD (closer to start), 1 - BACKWARD (away from start) 
+ vector<vector<int>> pathPlanner(std::vector<int> drink_list)
+{
+  // Note this function can be later optimized for better path planning
+  
+  int pos = 0;
+  while (!isStepperAtStart()) { resetRail(); }
+
+  std::vector<std::vector<int>> path;
+  std::vector<int> instruction;
+  for (int d = 0; d < drink_list.size(); d++) {
+    
+    instruction.push_back(0); // just does a sweep in a single direction
+    instruction.push_back(bottle_positions.at(d) - pos);
+    instruction.push_back(drink_list.at(d));
+
+    path.push_back(instruction);
+  }
+
+  return path;
+}
+
 void setup() 
 { 
+  while ( !(init()) ) {}  // run init until it works
   
-  //Serial.begin(9600);  // initiates serial communication
   
 } 
 
