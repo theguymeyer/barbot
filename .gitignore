@@ -5,3 +5,6 @@
 
 CAD/
 bin/
+code/.vscode/
+gcode/
+src_code/
