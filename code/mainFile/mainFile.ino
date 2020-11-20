@@ -41,19 +41,19 @@
 //        - the system will reset its end-effector -> first move piston down, then reset rail to starting position
 //        - the system will send finished drink code to UI
 //
-//         /                                /                                  /
-//      _\/_______                       _\/__________                      _\/____________                   _______________                   _______________  
-//  o-->|  INIT   |       -->            | USER_INPUT |       -->           | PATH_PLANNER |       -->        |  MAKE_DRINK  |       -->        | SERVE_DRINK |
-//      |_________|  SERIAL DETECTED     |____________|   PARSED MESSAGE    |______________|  DEFINED PLAN    |______________|  EXECUTED PATH   |_____________|
-//                                            /\                                                                                                       |
-//                                             |_______________________________________________________________________________________________________|
+//         /                                     /                                  /
+//      _\/_______                            _\/__________                      _\/____________                   _______________                   _______________  
+//  o-->|  INIT   |          -->              | USER_INPUT |       -->           | PATH_PLANNER |       -->        |  MAKE_DRINK  |       -->        | SERVE_DRINK |
+//      |_________|  SERIAL INIT DETECTED     |____________|   PARSED MESSAGE    |______________|  DEFINED PLAN    |______________|  EXECUTED PATH   |_____________|
+//                                                /\                                                                                                       |
+//                                                 |_______________________________________________________________________________________________________|
 //                                                                                                SERIAL DETECTED (new drink)
 //
 //
 //
 
-#include <iostream>
 #include <Adafruit_MotorShield.h>
+#include <Vector.h>
 
 #define DRINK_COUNT 5
 #define IR_THRESHOLD 0.9
@@ -65,9 +65,19 @@
 #define BOTTLE5_POS 4500
 #define RAIL_MAX 5500
 
+using namespace std;
+
 // init variables
 int QRE1113_Pin = 2; //connected to digital 2
-std::vector<int> bottle_positions = {BOTTLE1_POS, BOTTLE2_POS, BOTTLE3_POS, BOTTLE4_POS, BOTTLE5_POS};
+int bottle_position [5] = {BOTTLE1_POS, BOTTLE2_POS, BOTTLE3_POS, BOTTLE4_POS, BOTTLE5_POS};
+
+Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
+Adafruit_StepperMotor *myMotor = AFMS.getStepper(200, 2);
+
+
+// state variables
+int pmsg [DRINK_COUNT] = {0};  // parsed message
+int path [DRINK_COUNT][2] = {0}; // servo path
 
 /* --- Custom Functions --- */
 
@@ -90,30 +100,22 @@ bool resetRail()
 
   pistonDown(); 
 
-  try
-  {
-    int QRE_Value = 0;
-    while(QRE_Value < IR_THRESHOLD) {
-      myMotor->step(1, FORWARD, DOUBLE);  // move closer
+  int QRE_Value = 0;
+  while(QRE_Value < IR_THRESHOLD) {
+    myMotor->step(1, FORWARD, DOUBLE);  // move closer
 
-      delay(2); // give the motor time to move
-      QRE_Value = digitalRead(QRE1113_Pin);
-    }
-
-    // reached start
-    pistonUp();
-    return true;
-
+    delay(2); // give the motor time to move
+    QRE_Value = digitalRead(QRE1113_Pin);
   }
-  catch (const std::exception& e) 
-  {
-    std::cout << "Exception Caught\n";
-  }
-  
-  return false;
+
+  // reached start
+  pistonUp();
+  return true;
+
 }
 
-// fuck this is an open loop system - this is the best i can do :/
+// fuck this is an open loop system with one sensor at start - this is the best i can do :/
+// The stepper is also counting steps
 bool isStepperAtStart()
 {
   if (digitalRead(QRE1113_Pin) > IR_THRESHOLD) {
@@ -127,20 +129,18 @@ bool isStepperAtStart()
 
 // system init - runs on boot
 // -> returns true when serial is established and the rail is reset (returns false otherwise)
-bool init()
+bool init_sys()
 {
 
-  Serial.begin(9600); // init serial - no direct imports
-
-  Serial.print("HI"); // ACK send
-
-  int ACK;
+  String ACK;
   if (Serial.available()) {
-    ACK = Serial.read();  // ACK receive
+    ACK = Serial.readString();  // ACK receive
 
-    if (ACK == "HI") {  // transition criteria
+    if (ACK == "OK\n") {  // transition criteria
 
       resetRail();
+
+      Serial.flush();
       return true;
     }
   }
@@ -150,63 +150,70 @@ bool init()
 }
 
 // a waiting state for serial input regarding drink info
-// returns drink list (requirements for each drink) starting from closest
-std::vector<int> userInput()
+// updates the message buffer from serial stream (requirements for each drink) starting from closest
+void userInput(int msg_buffer[])
 {
 
-  Serial.flush();
+  String message = Serial.readString();
 
-  char* message = '';
-  std::vector<int> parsed_message (DRINK_COUNT, 0);
-
-  if (Serial.available()) { // keep checking serial
-    message = Stream.read();
-
-    if (message != '') {  // if message in buffer
-      for (int i = 0; i < DRINK_COUNT; i++) {
-        parsed_message[i] = (int)(message[i]);
-      }
-
-      break;
+  if (message != NULL) {  // if message in buffer
+    for (int i = 0; i < DRINK_COUNT; i++) {
+      msg_buffer[i] = (int)(message[i]);
     }
   }
 
-  return parsed_message;
 }
 
 // Takes the user input and builds a path for the servo as a list of steps with directions
 // returns a list of instructions for the stepper (2d vector) [direction, steps, shots]
 // direction defined as 0 - FORWARD (closer to start), 1 - BACKWARD (away from start) 
- vector<vector<int>> pathPlanner(std::vector<int> drink_list)
+void pathPlanner(int msg_buffer[], int path_buffer[][2])
 {
   // Note this function can be later optimized for better path planning
   
   int pos = 0;
   while (!isStepperAtStart()) { resetRail(); }
 
-  std::vector<std::vector<int>> path;
-  std::vector<int> instruction;
-  for (int d = 0; d < drink_list.size(); d++) {
+  int instruction [2] = {0,0};
+  for (int d = 0; d < sizeof(*msg_buffer); d++) {
     
-    instruction.push_back(0); // just does a sweep in a single direction
-    instruction.push_back(bottle_positions.at(d) - pos);
-    instruction.push_back(drink_list.at(d));
+    instruction[0] = bottle_position[d] - pos;
+    instruction[1] = msg_buffer[d];
 
-    path.push_back(instruction);
+    *path_buffer[d] = instruction;
   }
 
-  return path;
 }
 
 void setup() 
 { 
-  while ( !(init()) ) {}  // run init until it works
-  
+  Serial.begin(9600); // init serial - no direct imports
+
+  while (!Serial)
+  {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+
+  while ( !(init_sys()) ) {}  // run init until it works and system is ready to go (return true)
   
 } 
 
 void loop() 
 {
+
+  if (Serial.available()) { // keep checking serial
+    userInput(pmsg);
+    
+    // path planner
+    pathPlanner(pmsg, path);
+    
+    // exec (move servo and actuate piston)
+    
+    // return home
+
+  }
+
+  // wait for new input
 
 }
 
