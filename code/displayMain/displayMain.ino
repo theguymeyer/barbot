@@ -142,6 +142,49 @@ int timeToDebounce(int lastButtonPress)
   return lastButtonPress + (int)debounceTime;
 }
 
+// wait on status update from mainFile
+void wait_update()
+{
+
+  // give time for serial msg to send
+  delay(1000);
+
+  lcd.setCursor(0, 0);
+  lcd.print(clearLCD);
+  lcd.setCursor(0, 1);
+  lcd.print(clearLCD);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Working...");
+
+  delay(20);
+
+  while (!Serial.available()) {}
+
+  // prepare to write msg
+  lcd.setCursor(0, 0);
+  lcd.print(clearLCD);
+  lcd.setCursor(0, 1);
+  lcd.print(clearLCD);
+
+  lcd.setCursor(0, 0);
+
+  String message = Serial.readString();
+
+  if (message == "DONE") {
+    lcd.print("Enjoy :)");
+  } else {
+    lcd.print("Error 001");
+  }
+
+
+  // clean up
+  Serial.flush();
+  Serial.flush();
+
+
+}
+
 // Arduino Stateflow (the 'main') - includes setup() and loop()
 void setup()
 {
@@ -205,6 +248,7 @@ void loop()
     case btnSELECT:
     {
       Serial.print(drink.get_drink());
+      wait_update();
       break;
     }
     case btnNONE:
