@@ -65,6 +65,8 @@
 #define BOTTLE5_POS 4500
 #define RAIL_MAX 5500
 
+#define DRINK_HOLD_TIME 2500
+
 using namespace std;
 
 // init variables
@@ -171,17 +173,16 @@ void pathPlanner(int msg_buffer[], int path_buffer[][2])
 {
   // Note this function can be later optimized for better path planning
   
-  int pos = 0;
   while (!isStepperAtStart()) { resetRail(); }
 
   int instruction [2] = {0,0};
   for (int d = 0; d < sizeof(msg_buffer); d++) {
 
     if (msg_buffer[d] != 0) {
-      instruction[0] = bottle_position[d] - pos;
+      instruction[0] = bottle_position[d];
       instruction[1] = msg_buffer[d];
 
-      path_buffer[d] = instruction;
+      *path_buffer[d] = instruction;
     }
   }
 
@@ -196,21 +197,33 @@ void exec(int path_buf[][2])
 
   // since resetRail... therefore... 
   int loc = 0;
+  uint8_t dir;
 
   for (int i = 0; i < sizeof(path_buf); i++) {
 
-    // move stepper to position until within margin of error
-    while (loc - path) {
+    // move stepper to position until within margin of error - 10 steps
+    while (abs(path_buf[i][0] - loc) < 10) {
+      if (path_buf[i][0] > loc) {
+        myMotor->step(1, BACKWARD, DOUBLE);
+      } else {
+        myMotor->step(1, FORWARD, DOUBLE);
+      }
+
+      delay(2); // give the motor time to move
+    }
+
+    for (int j = 0; j < path_buf[i][1]; j++) {
+
+      delay(50);
+      pistonUp();
+      delay(DRINK_HOLD_TIME);
+      pistonDown();
+      delay(50);
 
     }
 
-    // pistonUp();
-
-    // hold
-
-    // pistonDown();
-
-    // hold
+    
+    delay(300);
 
   }
 
