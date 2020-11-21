@@ -164,6 +164,10 @@ void userInput(int msg_buffer[])
     }
   }
 
+  // clean up
+  Serial.flush();
+  Serial.flush();
+
 }
 
 // Takes the user input and builds a path for the servo as a list of steps with directions
@@ -227,6 +231,7 @@ void exec(int path_buf[][2])
 
   }
 
+  // return home
   resetRail();
 }
 
@@ -255,8 +260,9 @@ void loop()
     // exec (move servo and actuate piston)
     exec(path);
     
-    // return home
-
+    // notify user
+    Serial.print("DONE");
+    
   }
 
   // wait for new input
