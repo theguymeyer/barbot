@@ -251,7 +251,8 @@ void setup()
 void loop() 
 {
 
-  if (Serial.available()) { // keep checking serial
+  // wait for new input
+  if (Serial.available()) {
     userInput(pmsg);
     
     // path planner
@@ -265,7 +266,7 @@ void loop()
     
   }
 
-  // wait for new input
+  delay(10);
 
 }
 
