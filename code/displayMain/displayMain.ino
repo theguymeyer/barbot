@@ -175,6 +175,8 @@ void wait_update()
     lcd.print("Enjoy :)");
   } else {
     lcd.print("Error 001");
+    delay(3000);
+
   }
 
 
@@ -213,8 +215,8 @@ void loop()
 
   userLocationLCD(&user, &drink);
 
-  Serial.println(String(millis()));
-  Serial.println(String(debounceReleaseTime));
+  // Serial.println(String(millis()));
+  // Serial.println(String(debounceReleaseTime));
 
   if (millis() > debounceReleaseTime)
   {
