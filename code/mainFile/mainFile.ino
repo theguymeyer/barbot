@@ -171,6 +171,10 @@ void userInput(int msg_buffer[])
     }
   }
 
+  // clean up
+  Serial.flush();
+  Serial.flush();
+
 }
 
 // Takes the user input and builds a path for the servo as a list of steps with directions
@@ -244,6 +248,7 @@ void exec(int path_buf[][2], int stop_count)
 
   }
 
+  // return home
   resetRail();
 }
 
@@ -272,7 +277,8 @@ void setup()
 void loop() 
 {
 
-  if (Serial.available()) { // keep checking serial
+  // wait for new input
+  if (Serial.available()) {
     userInput(pmsg);
     
     // path planner
