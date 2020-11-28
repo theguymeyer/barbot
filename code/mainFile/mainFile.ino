@@ -65,21 +65,30 @@
 #define BOTTLE5_POS 4500
 #define RAIL_MAX 5500
 
+// TESTING
+//#define BOTTLE1_POS 100   // in number fo steps from start
+//#define BOTTLE2_POS 200
+//#define BOTTLE3_POS 300
+//#define BOTTLE4_POS 400
+//#define BOTTLE5_POS 500
+//#define RAIL_MAX 1000
+
 #define DRINK_HOLD_TIME 2500
 
-using namespace std;
+//using namespace std;
 
 // init variables
 int QRE1113_Pin = 2; //connected to digital 2
 int bottle_position [5] = {BOTTLE1_POS, BOTTLE2_POS, BOTTLE3_POS, BOTTLE4_POS, BOTTLE5_POS};
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
-Adafruit_StepperMotor *myMotor = AFMS.getStepper(200, 2);
+Adafruit_StepperMotor *myMotor = AFMS.getStepper(200, 1);
 
 
 // state variables
 int pmsg [DRINK_COUNT] = {0};  // parsed message
 int path [DRINK_COUNT][2] = {0}; // servo path
+int stop_count = 0;
 
 /* --- Custom Functions --- */
 
@@ -99,15 +108,11 @@ bool pistonUp()
 // -> return true on successful motion (returns false otherwise)
 bool resetRail()
 {
-
   pistonDown(); 
-
-  int QRE_Value = 0;
-  while(QRE_Value < IR_THRESHOLD) {
-    myMotor->step(1, FORWARD, DOUBLE);  // move closer
-
+  
+  while(!(isStepperAtStart())) {
+    myMotor->step(10, FORWARD, DOUBLE);  // move closer
     delay(2); // give the motor time to move
-    QRE_Value = digitalRead(QRE1113_Pin);
   }
 
   // reached start
@@ -120,7 +125,8 @@ bool resetRail()
 // The stepper is also counting steps
 bool isStepperAtStart()
 {
-  if (digitalRead(QRE1113_Pin) > IR_THRESHOLD) {
+  
+  if (digitalRead(QRE1113_Pin)) {
     return true;
   }
 
@@ -143,6 +149,7 @@ bool init_sys()
       resetRail();
 
       Serial.flush();
+      Serial.flush();
       return true;
     }
   }
@@ -160,7 +167,7 @@ void userInput(int msg_buffer[])
 
   if (message != NULL) {  // if message in buffer
     for (int i = 0; i < DRINK_COUNT; i++) {
-      msg_buffer[i] = (int)(message[i]);
+      msg_buffer[i] = message[i] - '0';
     }
   }
 
@@ -169,44 +176,54 @@ void userInput(int msg_buffer[])
 // Takes the user input and builds a path for the servo as a list of steps with directions
 // returns a list of instructions for the stepper (2d vector) [direction, steps, shots]
 // direction defined as 0 - FORWARD (closer to start), 1 - BACKWARD (away from start) 
-void pathPlanner(int msg_buffer[], int path_buffer[][2])
+// RETURNS the number of stops (ie. number of different requested drinks, the volume of each does not matter)
+int pathPlanner(int msg_buffer[], int path_buffer[][2])
 {
   // Note this function can be later optimized for better path planning
   
-  while (!isStepperAtStart()) { resetRail(); }
+//  while (!isStepperAtStart()) { resetRail(); }
 
   int instruction [2] = {0,0};
-  for (int d = 0; d < sizeof(msg_buffer); d++) {
+  int path_index = 0;
+  for (int d = 0; d < DRINK_COUNT; d++) {
 
     if (msg_buffer[d] != 0) {
-      instruction[0] = bottle_position[d];
-      instruction[1] = msg_buffer[d];
-
-      *path_buffer[d] = instruction;
+      path_buffer[path_index][0] = bottle_position[d];
+      path_buffer[path_index][1] = msg_buffer[d];
     }
+
+    path_index ++;
   }
+
+  return path_index;
 
 }
 
 // Execution of path - moves cup through positions and pours liquor
 // Assumption: only requested liquors are in the path buffer
-void exec(int path_buf[][2])
+void exec(int path_buf[][2], int stop_count)
 {
 
   resetRail();
+  myMotor->step(10, BACKWARD, DOUBLE);
 
   // since resetRail... therefore... 
   int loc = 0;
   uint8_t dir;
 
-  for (int i = 0; i < sizeof(path_buf); i++) {
+  for (int i = 0; i < stop_count; i++) {
 
     // move stepper to position until within margin of error - 10 steps
-    while (abs(path_buf[i][0] - loc) < 10) {
+    while (abs(path_buf[i][0] - loc) > 1) {
+      
+      if (isStepperAtStart() || loc > RAIL_MAX) { break; }
+      
       if (path_buf[i][0] > loc) {
         myMotor->step(1, BACKWARD, DOUBLE);
+        loc++;
       } else {
         myMotor->step(1, FORWARD, DOUBLE);
+        loc--;
       }
 
       delay(2); // give the motor time to move
@@ -239,6 +256,15 @@ void setup()
     ; // wait for serial port to connect. Needed for native USB port only
   }
 
+  AFMS.begin();  // create with the default frequency 1.6KHz
+  //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
+  
+  myMotor->setSpeed(400);  // 10 rpm 
+  pinMode( QRE1113_Pin, INPUT );
+
+//  myMotor->step(10, BACKWARD, DOUBLE);
+  //myMotor->release();
+
   while ( !(init_sys()) ) {}  // run init until it works and system is ready to go (return true)
   
 } 
@@ -250,16 +276,24 @@ void loop()
     userInput(pmsg);
     
     // path planner
-    pathPlanner(pmsg, path);
+    stop_count = pathPlanner(pmsg, path);
     
     // exec (move servo and actuate piston)
-    exec(path);
+    exec(path, stop_count);
     
     // return home
+
+    Serial.print("DONE");
+    delay(1000);
+    Serial.flush();
+    Serial.flush();
 
   }
 
   // wait for new input
+  delay(50);
+
+  
+  //Serial.println("thinking");
 
 }
-

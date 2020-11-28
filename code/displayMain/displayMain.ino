@@ -54,6 +54,7 @@ int adc_key_in = 0;
 #define btnLEFT 3
 #define btnSELECT 4
 #define btnNONE 5
+#define btnBKSP 6
 
 // useful definitions
 #define clearLCD "               "
@@ -67,6 +68,10 @@ long debounceReleaseTime = 0;
 // read the buttons - Author https://gist.github.com/pws5068/3279865, used for LCD interface
 int read_LCD_buttons()
 {
+
+  Serial.println(analogRead(A1));
+  if (analogRead(A1) < 30) { return btnBKSP; }  // reset screen
+  
   adc_key_in = analogRead(0); // read the value from the sensor
   // my buttons when read are centered at these valies: 0, 144, 329, 504, 741
   // we add approx 50 to those values and check to see if we are close
@@ -142,6 +147,17 @@ int timeToDebounce(int lastButtonPress)
   return lastButtonPress + (int)debounceTime;
 }
 
+// clear lcd
+void clearDisplay()
+{
+  lcd.setCursor(0, 0);
+  lcd.print(clearLCD);
+  lcd.setCursor(0, 1);
+  lcd.print(clearLCD);
+
+  lcd.setCursor(0, 0);
+}
+
 // wait on status update from mainFile
 void wait_update()
 {
@@ -149,12 +165,7 @@ void wait_update()
   // give time for serial msg to send
   delay(1000);
 
-  lcd.setCursor(0, 0);
-  lcd.print(clearLCD);
-  lcd.setCursor(0, 1);
-  lcd.print(clearLCD);
-
-  lcd.setCursor(0, 0);
+  clearDisplay();
   lcd.print("Working...");
 
   delay(20);
@@ -201,6 +212,7 @@ void setup()
 
   lcd.begin(16, 2); // start the library
   lcd.setCursor(0, 0);
+  pinMode(A1, INPUT_PULLUP);
 
   char *new_drink = "00000";
 
@@ -253,9 +265,17 @@ void loop()
       wait_update();
       break;
     }
+    case btnBKSP:
+    {
+      clearDisplay();
+
+      // reset user & reset drink
+      user.init_user();
+      drink.update_drink_structure("00000");
+      break;
+    }
     case btnNONE:
     {
-
       break;
     }
     }
