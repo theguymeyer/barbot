@@ -39,6 +39,7 @@ LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 
 // the drink
 Drink drink;
+char new_drink_struct[5] = "00000";
 
 // the user
 User user;
@@ -47,7 +48,7 @@ User user;
 
 // define some values used by the panel and buttons - Author https://gist.github.com/pws5068/3279865, used for LCD interface
 int lcd_key = 0;
-int adc_key_in = 0;
+int adc_key_in = 1050;  // Start with btnNONE state
 #define btnRIGHT 0
 #define btnUP 1
 #define btnDOWN 2
@@ -63,13 +64,12 @@ int adc_key_in = 0;
 // debounce Variables
 long debounceReleaseTime = 0;
 
-// Useful Functions for LCD
+// ---- Useful Functions for LCD ----
 
 // read the buttons - Author https://gist.github.com/pws5068/3279865, used for LCD interface
 int read_LCD_buttons()
 {
 
-  Serial.println(analogRead(A1));
   if (analogRead(A1) < 30) { return btnBKSP; }  // reset screen
   
   adc_key_in = analogRead(0); // read the value from the sensor
@@ -186,16 +186,24 @@ void wait_update()
     lcd.print("Enjoy :)");
   } else {
     lcd.print("Error 001");
-    delay(3000);
 
   }
 
+  delay(3000);
 
   // clean up
   Serial.flush();
   Serial.flush();
 
 
+}
+
+void systemReset()
+{
+  user.init_user();
+  drink.init_drink(&new_drink_struct[0]);
+
+  clearDisplay();
 }
 
 // Arduino Stateflow (the 'main') - includes setup() and loop()
@@ -214,22 +222,16 @@ void setup()
   lcd.setCursor(0, 0);
   pinMode(A1, INPUT_PULLUP);
 
-  char *new_drink = "00000";
-
   user.init_user();
-  drink.init_drink(&new_drink[0]);
+  drink.init_drink(&new_drink_struct[0]);
 }
 
 void loop()
 {
-  char *new_drink = drink.get_drink();
-  writeToLCD(new_drink);
+  writeToLCD(drink.get_drink());
 
   userLocationLCD(&user, &drink);
-
-  // Serial.println(String(millis()));
-  // Serial.println(String(debounceReleaseTime));
-
+  
   if (millis() > debounceReleaseTime)
   {
 
@@ -263,15 +265,13 @@ void loop()
     {
       Serial.print(drink.get_drink());
       wait_update();
+      systemReset();
       break;
     }
     case btnBKSP:
     {
-      clearDisplay();
-
       // reset user & reset drink
-      user.init_user();
-      drink.update_drink_structure("00000");
+      systemReset();
       break;
     }
     case btnNONE:
