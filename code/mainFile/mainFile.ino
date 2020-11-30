@@ -73,12 +73,15 @@
 //#define BOTTLE5_POS 500
 //#define RAIL_MAX 1000
 
-#define DRINK_HOLD_TIME 2500
+#define DRINK_HOLD_TIME 3000
+#define DRINK_INBETWEEN_TIME 2500
 
 //using namespace std;
 
 // init variables
-int QRE1113_Pin = 2; //connected to digital 2
+int LimitSW_Pin = 2;    // connected to digital 2
+int pistonUp_Pin = 6;   // pneumatic controls
+int pistonDown_Pin = 7;
 int bottle_position [5] = {BOTTLE1_POS, BOTTLE2_POS, BOTTLE3_POS, BOTTLE4_POS, BOTTLE5_POS};
 
 Adafruit_MotorShield AFMS = Adafruit_MotorShield(); 
@@ -95,13 +98,15 @@ int stop_count = 0;
 // alters the solenoid values to move the piston DOWN
 bool pistonDown()
 {
-  // TODO trigger relay for piston motion DOWN
+  digitalWrite(pistonUp_Pin, LOW);
+  digitalWrite(pistonDown_Pin, HIGH);
 }
 
 // alters the solenoid values to move the piston UP
 bool pistonUp()
 {
-  // TODO trigger relay for piston motion UP
+  digitalWrite(pistonDown_Pin, LOW);
+  digitalWrite(pistonUp_Pin, HIGH);
 }
 
 // moves the drink closer to the IR (starting position) with incremental steps
@@ -109,6 +114,7 @@ bool pistonUp()
 bool resetRail()
 {
   pistonDown(); 
+  delay(2000);
   
   while(!(isStepperAtStart())) {
     myMotor->step(10, FORWARD, DOUBLE);  // move closer
@@ -121,12 +127,10 @@ bool resetRail()
 
 }
 
-// fuck this is an open loop system with one sensor at start - this is the best i can do :/
-// The stepper is also counting steps
 bool isStepperAtStart()
 {
   
-  if (digitalRead(QRE1113_Pin)) {
+  if (digitalRead(LimitSW_Pin)) {
     return true;
   }
 
@@ -194,9 +198,9 @@ int pathPlanner(int msg_buffer[], int path_buffer[][2])
     if (msg_buffer[d] != 0) {
       path_buffer[path_index][0] = bottle_position[d];
       path_buffer[path_index][1] = msg_buffer[d];
+      path_index ++;
     }
 
-    path_index ++;
   }
 
   return path_index;
@@ -209,18 +213,24 @@ void exec(int path_buf[][2], int stop_count)
 {
 
   resetRail();
-  myMotor->step(10, BACKWARD, DOUBLE);
+  pistonDown();
+  delay(1000);
 
-  // since resetRail... therefore... 
-  int loc = 0;
+  int loc = 50;
   uint8_t dir;
+  
+  myMotor->step(loc, BACKWARD, DOUBLE);
 
   for (int i = 0; i < stop_count; i++) {
 
     // move stepper to position until within margin of error - 10 steps
     while (abs(path_buf[i][0] - loc) > 1) {
       
-      if (isStepperAtStart() || loc > RAIL_MAX) { break; }
+      if (isStepperAtStart() || loc > RAIL_MAX) { 
+        pistonDown();
+        resetRail();
+        return ; 
+      }
       
       if (path_buf[i][0] > loc) {
         myMotor->step(1, BACKWARD, DOUBLE);
@@ -230,16 +240,16 @@ void exec(int path_buf[][2], int stop_count)
         loc--;
       }
 
-      delay(2); // give the motor time to move
+//      delay(2); // give the motor time to move
     }
 
     for (int j = 0; j < path_buf[i][1]; j++) {
 
-      delay(50);
+      delay(DRINK_INBETWEEN_TIME);
       pistonUp();
       delay(DRINK_HOLD_TIME);
       pistonDown();
-      delay(50);
+      delay(DRINK_INBETWEEN_TIME);
 
     }
 
@@ -250,6 +260,9 @@ void exec(int path_buf[][2], int stop_count)
 
   // return home
   resetRail();
+  delay(100);
+  myMotor->release();
+  
 }
 
 void setup() 
@@ -262,10 +275,11 @@ void setup()
   }
 
   AFMS.begin();  // create with the default frequency 1.6KHz
-  //AFMS.begin(1000);  // OR with a different frequency, say 1KHz
+  myMotor->setSpeed(1000);  // 10 rpm 
   
-  myMotor->setSpeed(400);  // 10 rpm 
-  pinMode( QRE1113_Pin, INPUT );
+  pinMode(LimitSW_Pin, INPUT);
+  pinMode(pistonUp_Pin, OUTPUT);
+  pinMode(pistonDown_Pin, OUTPUT);
 
 //  myMotor->step(10, BACKWARD, DOUBLE);
   //myMotor->release();
